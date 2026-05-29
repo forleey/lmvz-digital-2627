@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Benutzer – Filter-Combobox + Tabelle (isoliert)</title>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body, #root { height: 100%; }
+  body { font-family: 'Inter', -apple-system, Helvetica, sans-serif; font-size: 13px; color: #1a1a1a; background: #f5f6f7; }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #d0d5dd; border-radius: 3px; }
+
+  @keyframes filterPanelIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .filter-panel-anim { animation: filterPanelIn 0.16s ease-out forwards; }
+
+  /* Custom checkbox */
+  .cb-wrap {
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+    position: relative; width: 36px; height: 36px; flex-shrink: 0;
+  }
+  .cb-wrap input[type=checkbox] { display: none; }
+  .cb-ripple {
+    position: absolute; width: 36px; height: 36px; border-radius: 50%;
+    background: #0E7AB4; opacity: 0; top: 0; left: 0; transform: scale(0.3);
+    transition: opacity 0.2s ease-out, transform 0.2s ease-out; pointer-events: none;
+  }
+  .cb-wrap:hover .cb-ripple { opacity: 0.13; transform: scale(1); }
+  .cb-box {
+    width: 16px; height: 16px; border: 1.5px solid #c2c7d0; border-radius: 3px;
+    background: #fff; display: flex; align-items: center; justify-content: center;
+    transition: background 0.12s, border-color 0.12s;
+    flex-shrink: 0; position: relative; z-index: 1;
+  }
+  .cb-box.checked { background: #0E7AB4; border-color: #0E7AB4; }
+  .cb-box.indeterminate { background: #0E7AB4; border-color: #0E7AB4; }
+  .cb-check { width: 9px; height: 7px; stroke: #fff; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* Filter chip / token */
+  .filter-chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 10px; border-radius: 100px;
+    background: #e8f6f9; color: #1a8fa8; font-size: 12px; font-weight: 500;
+    cursor: pointer; border: 1px solid #b3e4ef; transition: background 0.1s;
+  }
+  .filter-chip:hover { background: #d0eef5; }
+  .filter-chip .chip-x { color: #1a8fa8; font-size: 14px; line-height: 1; opacity: 0.7; display: inline-flex; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+
+const { useState, useRef, useEffect } = React;
+
+// ── DATA ──────────────────────────────────────────────────────────────────────
+// Demo data. `lastOnline` is either 'Heute', 'vor N Tagen', or null.
+// Locked users carry `days` (days since last online) and render a red badge.
+const USERS = [
+  { id: 1,  last: 'Abazi',       first: 'Arbenita', username: 'arbenita.abazi.schueler',      email: '',                          role: 'Schüler',    lastOnline: null,           locked: false },
+  { id: 2,  last: 'Abazi',       first: 'Arbenita', username: 'arbenita.abazi.lehrperson',    email: 'arbenita.abazi@lmvz.ch',    role: 'Lehrperson', lastOnline: 'vor 8 Tagen',  locked: false },
+  { id: 3,  last: 'Abderhalden', first: 'Katja',    username: 'katja.abderhalden.schueler',   email: '',                          role: 'Schüler',    lastOnline: null,           locked: true,  days: 123 },
+  { id: 4,  last: 'Abderhalden', first: 'Katja',    username: 'katja.abderhalden.lehrperson', email: 'katja.abderhalden@lmvz.ch', role: 'Lehrperson', lastOnline: 'vor 21 Tagen', locked: false },
+  { id: 5,  last: 'Aepli',       first: 'Martina',  username: 'martina.aepli.lehrperson',     email: 'martina.aepli@lmvz.ch',     role: 'Lehrperson', lastOnline: 'vor 21 Tagen', locked: false },
+  { id: 6,  last: 'Aepli',       first: 'Martina',  username: 'martina.aepli.schueler',       email: '',                          role: 'Schüler',    lastOnline: null,           locked: true,  days: 164 },
+  { id: 7,  last: 'Ajdari',      first: 'Leona',    username: 'leona.ajdari.lehrperson',      email: 'leona.ajdari@lmvz.ch',      role: 'Lehrperson', lastOnline: 'vor 37 Tagen', locked: false },
+  { id: 8,  last: 'Ajdari',      first: 'Leona',    username: 'leona.ajdari.schueler',        email: '',                          role: 'Schüler',    lastOnline: null,           locked: true,  days: 361 },
+  { id: 9,  last: 'Altnoeder',   first: 'Thomas',   username: 'thomas.altnoeder.schueler',    email: '',                          role: 'Schüler',    lastOnline: null,           locked: true,  days: 994 },
+  { id: 10, last: 'Altnoeder',   first: 'Thomas',   username: 'thomas.altnoeder.lehrperson',  email: 'thomas.altnoeder@lmvz.ch',  role: 'Lehrperson', lastOnline: null,           locked: true,  days: 115 },
+  { id: 11, last: 'Andrä',       first: 'Michael',  username: 'michael.andrae.schueler',      email: '',                          role: 'Schüler',    lastOnline: null,           locked: true,  days: 66 },
+  { id: 12, last: 'Andrä',       first: 'Michael',  username: 'michael.andrae.lehrperson',    email: 'michael.andrae@lmvz.ch',    role: 'Lehrperson', lastOnline: 'Heute',        locked: false },
+  { id: 13, last: 'Ashiwaju',    first: 'Shehu',    username: 'shehu.ashiwaju.schueler',      email: '',                          role: 'Schüler',    lastOnline: null,           locked: false },
+  { id: 14, last: 'Ashiwaju',    first: 'Shehu',    username: 'shehu.ashiwaju.lehrperson',    email: 'shehu.ashiwaju@lmvz.ch',    role: 'Lehrperson', lastOnline: null,           locked: true,  days: 912 },
+  { id: 15, last: 'Bagardi',     first: 'Ali',      username: 'ali.bagardi.schueler',         email: '',                          role: 'Schüler',    lastOnline: null,           locked: true,  days: 175 }
+];
+
+// ── ICONS ───────────────────────────────────────────────────────────────────
+const IconSearch = () =>
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9aa5b4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+  </svg>;
+const IconX = ({ size = 12 }) =>
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+  </svg>;
+const IconSort = () =>
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.45 }}>
+    <line x1="12" y1="5" x2="12" y2="19" /><polyline points="5 12 12 5 19 12" /><polyline style={{ opacity: 0.4 }} points="5 12 12 19 19 12" />
+  </svg>;
+const IconWarning = () =>
+  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+    <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+  </svg>;
+const IconDots = () =>
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+    <circle cx="12" cy="5" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="12" cy="19" r="2" />
+  </svg>;
+
+// ── CHECKBOX ──────────────────────────────────────────────────────────────────
+function Checkbox({ checked, indeterminate, onChange }) {
+  return (
+    <label className="cb-wrap" onClick={(e) => { e.stopPropagation(); onChange(!checked); }}>
+      <div className="cb-ripple" />
+      <div className={`cb-box ${indeterminate ? 'indeterminate' : checked ? 'checked' : ''}`}>
+        {indeterminate
+          ? <svg width="9" height="2" viewBox="0 0 9 2"><rect width="9" height="2" rx="1" fill="white" /></svg>
+          : checked
+          ? <svg className="cb-check" viewBox="0 0 10 8"><polyline points="1,4 4,7 9,1" /></svg>
+          : null}
+      </div>
+    </label>);
+}
+
+// ── FILTER-FACETTEN-LOGIK ─────────────────────────────────────────────────────
+// Turns a `lastOnline` string into a number of days (0 = today, null = never).
+function effDays(u) {
+  if (u.lastOnline === 'Heute') return 0;
+  const m = /vor (\d+) Tag/.exec(u.lastOnline || '');
+  if (m) return +m[1];
+  if (typeof u.days === 'number') return u.days;
+  return null;
+}
+function matchLastOnline(u, opt) {
+  const d = effDays(u);
+  if (opt === 'Nie') return d === null;
+  if (d === null) return false;
+  if (opt === 'Heute') return d === 0;
+  if (opt === 'Letzte 7 Tage') return d <= 7;
+  if (opt === 'Letzte 30 Tage') return d <= 30;
+  return true;
+}
+
+// Flattens the filter state into a list of toggleable facets, grouped for the dropdown.
+//   role        → multi-select (array)
+//   lastOnline  → single-select (string|null)
+//   locked / simplLogin → boolean flags
+function buildFacets(filters, setFilters) {
+  const roles = ['Schüler', 'Lehrperson', 'Administrator'];
+  const lastOnlineOpts = ['Heute', 'Letzte 7 Tage', 'Letzte 30 Tage', 'Nie'];
+  const out = [];
+  roles.forEach((r) => out.push({
+    fid: 'role:' + r, group: 'Rolle', label: r,
+    active: filters.roles.includes(r),
+    toggle: () => setFilters((f) => ({ ...f, roles: f.roles.includes(r) ? f.roles.filter((x) => x !== r) : [...f.roles, r] }))
+  }));
+  lastOnlineOpts.forEach((o) => out.push({
+    fid: 'lo:' + o, group: 'Zuletzt online', label: o,
+    active: filters.lastOnline === o,
+    toggle: () => setFilters((f) => ({ ...f, lastOnline: f.lastOnline === o ? null : o }))
+  }));
+  [['locked', 'Gesperrt'], ['simplLogin', 'Vereinfachtes Login']].forEach(([key, label]) => out.push({
+    fid: 'st:' + key, group: 'Status', label,
+    active: !!filters[key],
+    toggle: () => setFilters((f) => ({ ...f, [key]: !f[key] }))
+  }));
+  return out;
+}
+
+// ── FILTER-COMBOBOX ───────────────────────────────────────────────────────────
+// Combines free-text search and facet filtering in a single token-input field.
+// • Typing filters the table by full text (live) AND filters the facet suggestions.
+// • Picking a facet adds it as an inline chip/token and clears the typed text.
+// • Keyboard: ↑/↓ move highlight, Enter toggles, Backspace (empty) removes last token, Esc closes.
+function FilterCombobox({ filters, setFilters, searchQuery, setSearchQuery }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [activeIdx, setActiveIdx] = useState(0);
+  const wrapRef = useRef(null);
+  const inputRef = useRef(null);
+
+  const facets = buildFacets(filters, setFilters);
+  const tokens = facets.filter((f) => f.active);
+
+  const q = query.trim().toLowerCase();
+  const suggestions = facets.filter((f) => !q || f.label.toLowerCase().includes(q) || f.group.toLowerCase().includes(q));
+  const groups = [];
+  ['Rolle', 'Zuletzt online', 'Status'].forEach((g) => {
+    const items = suggestions.filter((s) => s.group === g);
+    if (items.length) groups.push({ g, items });
+  });
+  const flat = groups.flatMap((gr) => gr.items);
+
+  useEffect(() => { if (activeIdx > flat.length - 1) setActiveIdx(0); }, [query, flat.length]);
+  useEffect(() => {
+    function h(e) { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false); }
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, []);
+
+  function clearText() { setQuery(''); setSearchQuery(''); }
+  function pick(f) { f.toggle(); clearText(); inputRef.current && inputRef.current.focus(); }
+
+  function onKey(e) {
+    if (e.key === 'ArrowDown') { e.preventDefault(); setOpen(true); setActiveIdx((i) => Math.min(i + 1, flat.length - 1)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setActiveIdx((i) => Math.max(i - 1, 0)); }
+    else if (e.key === 'Enter') { e.preventDefault(); const f = flat[activeIdx]; if (f) pick(f); }
+    else if (e.key === 'Backspace' && query === '' && tokens.length) { e.preventDefault(); tokens[tokens.length - 1].toggle(); }
+    else if (e.key === 'Escape') { setOpen(false); inputRef.current && inputRef.current.blur(); }
+  }
+
+  return (
+    <div ref={wrapRef} style={{ position: 'relative', flex: '1 1 440px', minWidth: 260, maxWidth: 660 }}>
+      <div
+        onClick={() => { setOpen(true); inputRef.current && inputRef.current.focus(); }}
+        style={{
+          display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6,
+          padding: '4px 8px 4px 32px', position: 'relative',
+          border: `1.5px solid ${open ? '#0E7AB4' : '#e2e8f0'}`,
+          borderRadius: 8, background: '#fafafa', minHeight: 36, cursor: 'text',
+          transition: 'border-color 0.15s'
+        }}>
+        <div style={{ position: 'absolute', left: 10, top: 10, pointerEvents: 'none' }}><IconSearch /></div>
+        {tokens.map((t) => (
+          <span key={t.fid} className="filter-chip" onClick={(e) => { e.stopPropagation(); t.toggle(); }}>
+            <span style={{ opacity: 0.55, fontWeight: 400 }}>{t.group}:</span>&nbsp;{t.label}
+            <span className="chip-x"><IconX size={10} /></span>
+          </span>
+        ))}
+        <input
+          ref={inputRef}
+          type="text"
+          value={query}
+          placeholder={tokens.length ? 'Weiter filtern oder suchen …' : 'Suchen oder filtern – Name, Rolle, Status …'}
+          onChange={(e) => { setQuery(e.target.value); setSearchQuery(e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          onKeyDown={onKey}
+          style={{ flex: '1 1 130px', minWidth: 110, border: 'none', outline: 'none', background: 'transparent', fontFamily: 'inherit', fontSize: 13, color: '#374151', padding: '4px 0' }} />
+        {(tokens.length > 0 || query) && (
+          <button
+            onClick={(e) => { e.stopPropagation(); setFilters({ roles: [], lastOnline: null, locked: false, simplLogin: false }); clearText(); }}
+            title="Alle zurücksetzen"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9aa5b4', padding: 3, display: 'flex', alignItems: 'center' }}>
+            <IconX size={13} />
+          </button>
+        )}
+      </div>
+
+      {open && (
+        <div className="filter-panel-anim" style={{
+          position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 200,
+          background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.10)', padding: 7, maxHeight: 360, overflowY: 'auto'
+        }}>
+          {query && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', borderRadius: 7, background: '#f0fbfd', marginBottom: 2 }}>
+              <IconSearch />
+              <span style={{ fontSize: 13, color: '#374151' }}>Volltextsuche nach <strong style={{ color: '#0E7AB4', fontWeight: 600 }}>„{query}“</strong></span>
+            </div>
+          )}
+          {groups.length === 0 && (
+            <div style={{ padding: '8px 10px', color: '#9aa5b4', fontSize: 12.5 }}>
+              {query ? 'Keine passende Facette – Eingabe wird als Volltext gesucht.' : 'Keine Filter verfügbar.'}
+            </div>
+          )}
+          {groups.map((gr) => (
+            <div key={gr.g} style={{ marginBottom: 2 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: '#9aa5b4', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '7px 10px 4px' }}>{gr.g}</div>
+              {gr.items.map((it) => {
+                const idx = flat.indexOf(it);
+                const hl = idx === activeIdx;
+                return (
+                  <div key={it.fid}
+                    onMouseEnter={() => setActiveIdx(idx)}
+                    onClick={() => pick(it)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px', borderRadius: 7, cursor: 'pointer', background: hl ? '#f1f5f9' : 'transparent' }}>
+                    <span style={{
+                      width: 16, height: 16, borderRadius: 4, flexShrink: 0,
+                      border: `1.5px solid ${it.active ? '#0E7AB4' : '#c2c7d0'}`,
+                      background: it.active ? '#0E7AB4' : '#fff',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    }}>
+                      {it.active && <svg width="9" height="7" viewBox="0 0 10 8" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 3.6 6.6 9 1" /></svg>}
+                    </span>
+                    <span style={{ fontSize: 13, color: '#374151' }}>{it.label}</span>
+                  </div>);
+              })}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>);
+}
+
+// ── USER TABLE (Filter-Combobox + Tabelle) ─────────────────────────────────────
+function UserTable() {
+  const [selected, setSelected] = useState(new Set());
+  const [hoveredRow, setHoveredRow] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filters, setFilters] = useState({ roles: [], lastOnline: null, locked: false, simplLogin: false });
+
+  // Combined filtering: free-text search AND all active facets (AND semantics).
+  const filtered = USERS.filter((u) => {
+    const qq = searchQuery.toLowerCase();
+    if (qq && !u.last.toLowerCase().includes(qq) && !u.first.toLowerCase().includes(qq) && !u.username.toLowerCase().includes(qq) && !u.email.toLowerCase().includes(qq)) return false;
+    if (filters.roles.length && !filters.roles.includes(u.role)) return false;
+    if (filters.locked && !u.locked) return false;
+    if (filters.simplLogin && !u.simplLogin) return false;
+    if (filters.lastOnline && !matchLastOnline(u, filters.lastOnline)) return false;
+    return true;
+  });
+
+  const allChecked = filtered.length > 0 && filtered.every((u) => selected.has(u.id));
+
+  function toggleAll(v) { setSelected(v ? new Set(filtered.map((u) => u.id)) : new Set()); }
+  function toggleRow(id) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  const hasSelection = selected.size > 0;
+
+  return (
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#fff', maxWidth: 1120, margin: '0 auto', borderLeft: '1px solid #eef1f4', borderRight: '1px solid #eef1f4' }}>
+      {/* Toolbar */}
+      <div style={{ padding: '18px 28px 12px', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <FilterCombobox filters={filters} setFilters={setFilters} searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
+        </div>
+      </div>
+
+      {/* Table */}
+      <div style={{ flex: 1, overflow: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+          <colgroup>
+            <col style={{ width: 40 }} />
+            <col style={{ width: '16%' }} />
+            <col style={{ width: '13%' }} />
+            <col style={{ width: '22%' }} />
+            <col style={{ width: '20%' }} />
+            <col style={{ width: '10%' }} />
+            <col style={{ width: '14%' }} />
+            <col style={{ width: 44 }} />
+          </colgroup>
+          <thead>
+            <tr style={{ borderBottom: '2px solid #e8ecf0', background: '#fff', position: 'sticky', top: 0, zIndex: 5 }}>
+              <th style={{ padding: '10px 0 10px 14px', textAlign: 'center' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                  <Checkbox checked={allChecked} indeterminate={false} onChange={toggleAll} />
+                </div>
+              </th>
+              {['Nachname', 'Vorname', 'Benutzername', 'E-Mail-Adresse', 'Rolle', 'Zuletzt Online'].map((col) => (
+                <th key={col} style={{ padding: '10px 12px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#6b7280', userSelect: 'none', cursor: 'pointer' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                    {col}
+                    <IconSort />
+                  </div>
+                </th>
+              ))}
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((user) => {
+              const sel = selected.has(user.id);
+              const isHovered = hoveredRow === user.id;
+              let bg = '#fff';
+              if (sel) bg = '#edf8fb';
+              else if (isHovered) bg = '#f7fdfe';
+              return (
+                <tr
+                  key={user.id}
+                  onMouseEnter={() => setHoveredRow(user.id)}
+                  onMouseLeave={() => setHoveredRow(null)}
+                  style={{ background: bg, borderBottom: '1px solid #f1f5f9', cursor: 'pointer', transition: 'background 0.1s' }}>
+                  <td style={{ padding: '10px 0 10px 14px', textAlign: 'center', verticalAlign: 'middle' }}
+                    onClick={(e) => { e.stopPropagation(); toggleRow(user.id); }}>
+                    <Checkbox checked={sel} onChange={() => toggleRow(user.id)} />
+                  </td>
+                  <td style={{ padding: '10px 12px', fontSize: 13.5, color: '#111827', fontWeight: sel ? 500 : 400, verticalAlign: 'middle' }}>{user.last}</td>
+                  <td style={{ padding: '10px 12px', fontSize: 13.5, color: '#374151', verticalAlign: 'middle' }}>{user.first}</td>
+                  <td style={{ padding: '10px 12px', fontSize: 13, color: '#374151', verticalAlign: 'middle', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.username}</td>
+                  <td style={{ padding: '10px 12px', fontSize: 13, color: '#6b7280', verticalAlign: 'middle', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email || ''}</td>
+                  <td style={{ padding: '10px 12px', fontSize: 13, color: '#374151', verticalAlign: 'middle' }}>{user.role}</td>
+                  <td style={{ padding: '10px 12px', fontSize: 13, verticalAlign: 'middle' }}>
+                    {user.locked && user.days
+                      ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: 100, padding: '2px 9px', fontSize: 11.5, fontWeight: 500, whiteSpace: 'nowrap' }}>
+                          <IconWarning />vor {user.days} Tagen
+                        </span>
+                      : user.lastOnline
+                      ? <span style={{ color: '#6b7280' }}>{user.lastOnline}</span>
+                      : null}
+                  </td>
+                  <td style={{ padding: '6px 4px', textAlign: 'center', verticalAlign: 'middle' }}>
+                    <button
+                      onClick={(e) => e.stopPropagation()}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9aa5b4', padding: 6, borderRadius: 6, display: 'inline-flex' }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = '#eef2f6'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'none'}>
+                      <IconDots />
+                    </button>
+                  </td>
+                </tr>);
+            })}
+          </tbody>
+        </table>
+
+        {filtered.length === 0 &&
+          <div style={{ padding: '48px 28px', textAlign: 'center', color: '#9aa5b4', fontSize: 14 }}>
+            Keine Benutzer gefunden.
+          </div>}
+      </div>
+
+      {/* Footer count */}
+      <div style={{ padding: '8px 28px', borderTop: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+        <span style={{ fontSize: 12, color: '#9aa5b4' }}>
+          {filtered.length} Benutzer
+          {hasSelection && <> · <strong style={{ color: '#1a8fa8' }}>{selected.size} ausgewählt</strong></>}
+        </span>
+        {hasSelection &&
+          <button onClick={() => setSelected(new Set())} style={{ background: 'none', border: 'none', fontFamily: 'inherit', fontSize: 12, color: '#9aa5b4', cursor: 'pointer', textDecoration: 'underline' }}>
+            Auswahl aufheben
+          </button>}
+      </div>
+    </div>);
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<UserTable />);
+</script>
+</body>
+</html>
