@@ -211,82 +211,100 @@ function FilterCombobox({ filters, setFilters, searchQuery, setSearchQuery }) {
   }
 
   return (
-    <div ref={wrapRef} style={{ position: 'relative', flex: '1 1 440px', minWidth: 260, maxWidth: 660 }}>
-      <div
-        onClick={() => { setOpen(true); inputRef.current && inputRef.current.focus(); }}
-        style={{
-          display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6,
-          padding: '4px 8px 4px 32px', position: 'relative',
-          border: `1.5px solid ${open ? '#0E7AB4' : '#e2e8f0'}`,
-          borderRadius: 8, background: '#fafafa', minHeight: 36, cursor: 'text',
-          transition: 'border-color 0.15s'
-        }}>
-        <div style={{ position: 'absolute', left: 10, top: 10, pointerEvents: 'none' }}><IconSearch /></div>
-        {tokens.map((t) => (
-          <span key={t.fid} className="filter-chip" onClick={(e) => { e.stopPropagation(); t.toggle(); }}>
-            <span style={{ opacity: 0.55, fontWeight: 400 }}>{t.group}:</span>&nbsp;{t.label}
-            <span className="chip-x"><IconX size={10} /></span>
-          </span>
-        ))}
-        <input
-          ref={inputRef}
-          type="text"
-          value={query}
-          placeholder={tokens.length ? 'Weiter filtern oder suchen …' : 'Suchen oder filtern – Name, Rolle, Status …'}
-          onChange={(e) => { setQuery(e.target.value); setSearchQuery(e.target.value); setOpen(true); }}
-          onFocus={() => setOpen(true)}
-          onKeyDown={onKey}
-          style={{ flex: '1 1 130px', minWidth: 110, border: 'none', outline: 'none', background: 'transparent', fontFamily: 'inherit', fontSize: 13, color: '#374151', padding: '4px 0' }} />
-        {(tokens.length > 0 || query) && (
-          <button
-            onClick={(e) => { e.stopPropagation(); setFilters({ roles: [], lastOnline: null, locked: false, simplLogin: false }); clearText(); }}
-            title="Alle zurücksetzen"
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9aa5b4', padding: 3, display: 'flex', alignItems: 'center' }}>
-            <IconX size={13} />
-          </button>
+    <div ref={wrapRef} style={{ flex: '1 1 440px', minWidth: 260, maxWidth: 660 }}>
+      <div style={{ position: 'relative' }}>
+        <div
+          onClick={() => { setOpen(true); inputRef.current && inputRef.current.focus(); }}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '4px 8px 4px 32px', position: 'relative',
+            border: `1.5px solid ${open ? '#0E7AB4' : '#e2e8f0'}`,
+            borderRadius: 8, background: '#fafafa', minHeight: 36, cursor: 'text',
+            transition: 'border-color 0.15s'
+          }}>
+          <div style={{ position: 'absolute', left: 10, top: 10, pointerEvents: 'none' }}><IconSearch /></div>
+          <input
+            ref={inputRef}
+            type="text"
+            value={query}
+            placeholder={tokens.length ? 'Weiter filtern oder suchen …' : 'Suchen oder filtern – Name, Rolle, Status …'}
+            onChange={(e) => { setQuery(e.target.value); setSearchQuery(e.target.value); setOpen(true); }}
+            onFocus={() => setOpen(true)}
+            onKeyDown={onKey}
+            style={{ flex: '1 1 130px', minWidth: 110, border: 'none', outline: 'none', background: 'transparent', fontFamily: 'inherit', fontSize: 13, color: '#374151', padding: '4px 0' }} />
+          {(tokens.length > 0 || query) && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setFilters({ roles: [], lastOnline: null, locked: false, simplLogin: false }); clearText(); }}
+              title="Alle zurücksetzen"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9aa5b4', padding: 3, display: 'flex', alignItems: 'center' }}>
+              <IconX size={13} />
+            </button>
+          )}
+        </div>
+
+        {open && (
+          <div className="filter-panel-anim" style={{
+            position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 200,
+            background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.10)', padding: 7, maxHeight: 360, overflowY: 'auto'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '2px 4px 6px 10px', borderBottom: '1px solid #f1f5f9', marginBottom: 4 }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: '#9aa5b4', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Filter</span>
+              <button
+                onClick={(e) => { e.stopPropagation(); setOpen(false); inputRef.current && inputRef.current.blur(); }}
+                title="Schliessen"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: 12, fontWeight: 500, fontFamily: 'inherit', padding: '4px 7px', borderRadius: 6, transition: 'background 0.1s' }}
+                onMouseEnter={(e) => e.currentTarget.style.background = '#f1f5f9'}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'none'}>
+                Schliessen <IconX size={11} />
+              </button>
+            </div>
+            {query && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', borderRadius: 7, background: '#f0fbfd', marginBottom: 2 }}>
+                <IconSearch />
+                <span style={{ fontSize: 13, color: '#374151' }}>Volltextsuche nach <strong style={{ color: '#0E7AB4', fontWeight: 600 }}>„{query}“</strong></span>
+              </div>
+            )}
+            {groups.length === 0 && (
+              <div style={{ padding: '8px 10px', color: '#9aa5b4', fontSize: 12.5 }}>
+                {query ? 'Keine passende Facette – Eingabe wird als Volltext gesucht.' : 'Keine Filter verfügbar.'}
+              </div>
+            )}
+            {groups.map((gr) => (
+              <div key={gr.g} style={{ marginBottom: 2 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: '#9aa5b4', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '7px 10px 4px' }}>{gr.g}</div>
+                {gr.items.map((it) => {
+                  const idx = flat.indexOf(it);
+                  const hl = idx === activeIdx;
+                  return (
+                    <div key={it.fid}
+                      onMouseEnter={() => setActiveIdx(idx)}
+                      onClick={() => pick(it)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px', borderRadius: 7, cursor: 'pointer', background: hl ? '#f1f5f9' : 'transparent' }}>
+                      <span style={{
+                        width: 16, height: 16, borderRadius: 4, flexShrink: 0,
+                        border: `1.5px solid ${it.active ? '#0E7AB4' : '#c2c7d0'}`,
+                        background: it.active ? '#0E7AB4' : '#fff',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                      }}>
+                        {it.active && <svg width="9" height="7" viewBox="0 0 10 8" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 3.6 6.6 9 1" /></svg>}
+                      </span>
+                      <span style={{ fontSize: 13, color: '#374151' }}>{it.label}</span>
+                    </div>);
+                })}
+              </div>
+            ))}
+          </div>
         )}
       </div>
 
-      {open && (
-        <div className="filter-panel-anim" style={{
-          position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 200,
-          background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10,
-          boxShadow: '0 8px 24px rgba(0,0,0,0.10)', padding: 7, maxHeight: 360, overflowY: 'auto'
-        }}>
-          {query && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', borderRadius: 7, background: '#f0fbfd', marginBottom: 2 }}>
-              <IconSearch />
-              <span style={{ fontSize: 13, color: '#374151' }}>Volltextsuche nach <strong style={{ color: '#0E7AB4', fontWeight: 600 }}>„{query}“</strong></span>
-            </div>
-          )}
-          {groups.length === 0 && (
-            <div style={{ padding: '8px 10px', color: '#9aa5b4', fontSize: 12.5 }}>
-              {query ? 'Keine passende Facette – Eingabe wird als Volltext gesucht.' : 'Keine Filter verfügbar.'}
-            </div>
-          )}
-          {groups.map((gr) => (
-            <div key={gr.g} style={{ marginBottom: 2 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: '#9aa5b4', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '7px 10px 4px' }}>{gr.g}</div>
-              {gr.items.map((it) => {
-                const idx = flat.indexOf(it);
-                const hl = idx === activeIdx;
-                return (
-                  <div key={it.fid}
-                    onMouseEnter={() => setActiveIdx(idx)}
-                    onClick={() => pick(it)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px', borderRadius: 7, cursor: 'pointer', background: hl ? '#f1f5f9' : 'transparent' }}>
-                    <span style={{
-                      width: 16, height: 16, borderRadius: 4, flexShrink: 0,
-                      border: `1.5px solid ${it.active ? '#0E7AB4' : '#c2c7d0'}`,
-                      background: it.active ? '#0E7AB4' : '#fff',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center'
-                    }}>
-                      {it.active && <svg width="9" height="7" viewBox="0 0 10 8" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 3.6 6.6 9 1" /></svg>}
-                    </span>
-                    <span style={{ fontSize: 13, color: '#374151' }}>{it.label}</span>
-                  </div>);
-              })}
-            </div>
+      {tokens.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+          {tokens.map((t) => (
+            <span key={t.fid} className="filter-chip" onClick={(e) => { e.stopPropagation(); t.toggle(); }}>
+              <span style={{ opacity: 0.55, fontWeight: 400 }}>{t.group}:</span>&nbsp;{t.label}
+              <span className="chip-x"><IconX size={10} /></span>
+            </span>
           ))}
         </div>
       )}
